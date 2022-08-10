@@ -1,28 +1,36 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class CharacterController : MonoBehaviour
 {
     private Vector2 direction = Vector2.zero;
+    public static CharacterController Instance;
 
     private Vector3 minPos;
     private Vector3 maxPos;
     private bool isTrace = false;
+    public bool enemyHitWay = false;
 
     private Vector2 prevPos;
     private GridController gridController;
-    private int[,] map;
+    public int[,] map;
 
-
+    public int currentHP = 3;
+    [SerializeField] private Text currentHPText;
+    
     private Vector2 startWayPos;
     private Vector2 endWayPos;
     private Vector2 startWayPosMAP;
     private Vector2 endWayPosMAP;
     
+    [SerializeField] private GameObject gameOver;
+    
 
     private void Start()
     {
+        Instance = this;
         minPos = Camera.main.ViewportToWorldPoint(new Vector3(0, 0, Camera.main.nearClipPlane));   //Получаем вектор нижнего левого угла камеры
         maxPos = Camera.main.ViewportToWorldPoint(new Vector3(1f, 1f, Camera.main.nearClipPlane));   //Получаем верхний правый угол камеры
        gridController = GridController.Instance;
@@ -89,7 +97,6 @@ public class CharacterController : MonoBehaviour
         if (map[(int)Math.Ceiling((prevPos.x + maxPos.x )*2), (int)Math.Ceiling((prevPos.y + maxPos.y - 0.25)*2)] == 1
             && map[(int)Math.Ceiling((transform.position.x + maxPos.x )*2), (int)Math.Ceiling((transform.position.y + maxPos.y - 0.25)*2)] == 0)
         {
-            Debug.Log("HI");
             isTrace = true;
             gridController.SetTileWay((int) Math.Ceiling((transform.position.x - 0.25) * 2),
                 (int) Math.Ceiling((transform.position.y- 0.25) * 2));
@@ -99,17 +106,36 @@ public class CharacterController : MonoBehaviour
             
             startWayPosMAP = new Vector2((int) Math.Ceiling((transform.position.x + maxPos.x) * 2),
                 (int) Math.Ceiling((transform.position.y + maxPos.y - 0.25) * 2));
+            map[(int) Math.Ceiling((transform.position.x + maxPos.x) * 2),
+                (int) Math.Ceiling((transform.position.y + maxPos.y - 0.25) * 2)] = 2;
         }
         
     }
 
 
+    public void LossHP()
+    {
+        currentHP--;
+        currentHPText.text = $"HP: {currentHP}";
+        if (currentHP <= 0)
+        {
+            Time.timeScale = 0;
+            gameOver.SetActive(true);
+        }
+    }
 
     private IEnumerator WayTrack()
     {
         while (map[(int)Math.Ceiling((transform.position.x + maxPos.x )*2), 
                    (int)Math.Ceiling((transform.position.y + maxPos.y - 0.25)*2)] != 1)
         {
+            if (enemyHitWay)
+            {
+                enemyHitWay = false;
+                gridController.ThrowWayTruck(map);
+                LossHP();
+                yield break ;
+            }
             gridController.SetTileWay((int) Math.Ceiling((transform.position.x - 0.25) * 2),
                 (int) Math.Ceiling((transform.position.y- 0.25) * 2));
             map[(int) Math.Ceiling((transform.position.x + maxPos.x) * 2),
@@ -121,150 +147,95 @@ public class CharacterController : MonoBehaviour
             (int) Math.Ceiling((prevPos.y - 0.25) * 2));
         endWayPosMAP = new Vector2((int) Math.Ceiling((prevPos.x + maxPos.x) * 2),
             (int) Math.Ceiling((prevPos.y + maxPos.y - 0.25) * 2));
-        gridController.SetTileWater((int) Math.Ceiling(endWayPos.x),
-            (int) Math.Ceiling(endWayPos.y));
-        gridController.SetTileWater((int) Math.Ceiling(startWayPos.x),
-            (int) Math.Ceiling(startWayPos.y));
-
-
-
+        
 
         float startX = (int) Math.Ceiling(( Mathf.Abs(endWayPosMAP.x) - Mathf.Abs(startWayPosMAP.x)));
         float startY = (int) Math.Ceiling(( Mathf.Abs(endWayPosMAP.y) -  Mathf.Abs(startWayPosMAP.y)));
         int directionX;
-        int directionY;
-        float tmp;
+        int directionY = 0;
         if (startX >=0)
         {
             directionX = 1;
         }
         else
         {
-            Debug.Log("SWAP");
-            tmp = endWayPosMAP.x;
-            endWayPosMAP.x = startWayPosMAP.x;
-            startWayPosMAP.x = tmp;
             directionX = -1;
         }
-        
-        if (startY >=0)
-        {
-            directionY = 1;
-        }
-        else
-        {
-            Debug.Log("SWAP");  
-            tmp = endWayPosMAP.y;
-            endWayPosMAP.y = startWayPosMAP.y;
-            startWayPosMAP.y = tmp;
-            directionY = -1;
-        }
-        
-        
-        Debug.Log("START END");
-        Debug.Log(startWayPosMAP);
-        Debug.Log(endWayPosMAP);
-        Debug.Log(startWayPos);
-        Debug.Log(endWayPos);
-        
-        Debug.Log("New value");
-        Debug.Log(map[(int)startWayPosMAP.x,(int)startWayPosMAP.y]);
-        Debug.Log("X");
-        Debug.Log(directionX);
-        Debug.Log((int)startWayPosMAP.x);
-        Debug.Log((int)(endWayPosMAP.x));
-        Debug.Log("Y");
-        Debug.Log(directionY);
-        Debug.Log((int)startWayPosMAP.y);
-        Debug.Log((int)(endWayPosMAP.y));
 
-        for (int i = (int)(startWayPosMAP.x); i <= (int)(endWayPosMAP.x ); i++)
+        
+
+        if ( map[((int) (startWayPosMAP.x + directionX)), (int) (startWayPosMAP.y )] == 2)
         {
-            for (int j = (int)(startWayPosMAP.y); j <= (int)(endWayPosMAP.y); j++)
+            directionX = 0;
+            if (startY >0)
             {
-                Debug.Log("Prev value");
-                Debug.Log(map[i, j]);
-                
-                map[i, j] = 1;
-                
-                Debug.Log("New value");
-                Debug.Log(i);
-                Debug.Log(j);
+                directionY = 1;
+            }
+            else
+            {
+                directionY = -1;
             }
         }
+        
+        
+        if ( Mathf.Abs(startWayPosMAP.x) == Mathf.Abs(endWayPosMAP.x) //если линия прямая
+             && map[((int) (startWayPosMAP.x)), (int) ((startWayPosMAP.y + endWayPosMAP.y)/2)] == 2)
+        {
+            if (startWayPosMAP.x <= 17)
+            {
+                directionX = -(directionX);
+            }
+        }
+        else if ( Mathf.Abs(startWayPosMAP.y) == Mathf.Abs(endWayPosMAP.y) 
+                  && map[((int) ((startWayPosMAP.x + endWayPosMAP.x)/2)), (int) (startWayPosMAP.y)] == 2)
+        {
+            if (startWayPosMAP.y > 10)
+            {
+                directionY = -(directionY);
+            }
+        }
+        
+        
+        map[((int) (startWayPosMAP.x + directionX)), (int) (startWayPosMAP.y + directionY)] = 1;
+        map[((int) (startWayPosMAP.x)), (int) (startWayPosMAP.y)] = 1;
+        gridController.PaintArea( map,((int) (startWayPosMAP.x + directionX)), (int) (startWayPosMAP.y + directionY));
 
+
+        for (int i = 1; i < map.GetUpperBound(0); i++)//закрашивание замкнутой путем области
+        {
+            for (int j = 1; j < map.GetUpperBound(1); j++)
+            {
+                if (map[i,j] == 0 && map[i - 1,j - 1] == 2&& map[i - 1,j] == 2 && map[i,j - 1] == 2 )
+                {
+                    int k = j;
+                    int m = i;
+                    while (map[i,k] != 2)
+                    {
+                        k++;
+                        if (k == map.GetUpperBound(1))
+                        {
+                            break;
+                        }
+                    }
+                    while (map[m,j] != 2)
+                    {
+                        m++;
+                        if (m == map.GetUpperBound(0))
+                        {
+                            break;
+                        }
+                    }
+
+                    if (map[i,k] == 2 && map[m,j] == 2)
+                    {
+                        map[i, j] = 1;
+                        gridController.PaintArea(map,i,j);
+                    }
+                }
+            }
+        }
+        
         gridController.UpdateMap(map);
 
     }
-
-   /* private IEnumerator Movement()
-    {
-        while (!Input.GetKeyDown(KeyCode.W) && !Input.GetKeyDown(KeyCode.S) 
-                                           && !Input.GetKeyDown(KeyCode.A) &&    !Input.GetKeyDown(KeyCode.D))
-        {
-            yield return null;
-        }
-        
-        while (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.S) 
-                                            || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.D))
-        {
-            if (Input.GetKeyDown(KeyCode.W))
-                direction = Vector2.up;
-            else if (Input.GetKeyDown(KeyCode.S))
-                direction = Vector2.down;
-            else if (Input.GetKeyDown(KeyCode.A))
-                direction = Vector2.left;
-            else if (Input.GetKeyDown(KeyCode.D))
-                direction = Vector2.right;
-            
-            
-            
-            if (transform.position.x >= maxPos.x - 0.25f)
-            {
-                if (direction != Vector2.left)
-                {
-                    direction = new Vector2(0, direction.y);
-                }
-            }
-
-            if (transform.position.x <= minPos.x + 0.25f )
-            {
-                if (direction != Vector2.right)
-                {
-                    direction = new Vector2(0, direction.y);
-                }
-            }
-        
-            if (transform.position.y >= maxPos.y - 0.25f)
-            {
-                if (direction != Vector2.down)
-                {
-                    direction = new Vector2(direction.x, 0);
-                }
-            }
-        
-            if (transform.position.y <= minPos.y + 0.7f)
-            {
-                if (direction != Vector2.up)
-                {
-                    direction = new Vector2(direction.x, 0);
-                }
-            }
-            
-            
-        }
-        
-
-
-        StartCoroutine(Movement());
-    }
-
-    private IEnumerator Move()
-    {
-        transform.position = new Vector3(transform.position.x + direction.x/2, transform.position.y + direction.y/2,
-            transform.position.z);
-        
-        yield return new WaitForFixedUpdate();
-        StartCoroutine(Move());
-    }*/
 }
